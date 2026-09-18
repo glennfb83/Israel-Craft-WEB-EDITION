@@ -15,7 +15,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 #minimap{width:150px;height:150px;position:fixed;z-index:2;top:110px;right:10px;border:1px solid var(--line);border-radius:14px;background:#5b9b4a;image-rendering:pixelated}
 #status{position:fixed;z-index:2;top:76px;left:50%;transform:translateX(-50%);padding:8px 12px;text-align:center;max-width:calc(100% - 24px)}
 #dialog{display:none;position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));padding:14px}
-.dialog-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.dialog-head button{font-size:24px;background:none;border:0;color:#fff}.dialog-text{margin-top:10px;line-height:1.5}
+.dialog-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.dialog-head button{font-size:24px;background:none;border:0;color:#fff}.dialog-text{margin-top:10px;line-height:1.45}
 #bottom{position:fixed;z-index:2;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;gap:10px}
 .controls{display:flex;align-items:center;gap:10px;padding:10px}
 .move-pad{width:118px;height:92px;display:grid;grid-template:repeat(3,30px)/repeat(3,30px);justify-content:center;align-content:center}
@@ -62,6 +62,11 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const world = {
     size: 32,
     tiles: [],
+    houses: [
+      { x: 6, y: 6, w: 5, h: 5, door: { x: 8, y: 10 } },
+      { x: 20, y: 7, w: 5, h: 5, door: { x: 22, y: 11 } },
+      { x: 12, y: 22, w: 6, h: 5, door: { x: 15, y: 26 } }
+    ],
     npcs: [
       { name: 'Flippy', x: 8, y: 8, line: 'Going flippy? To be frank, happens to the best of us.' },
       { name: 'Frank', x: 24, y: 13, line: 'The village is quiet when the wind is kind.' },
@@ -99,6 +104,16 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
       }
     }
 
+    for (const house of world.houses) {
+      for (let y = house.y; y < house.y + house.h; y++) {
+        for (let x = house.x; x < house.x + house.w; x++) {
+          const edgeWall = x === house.x || x === house.x + house.w - 1 || y === house.y || y === house.y + house.h - 1;
+          const isDoor = x === house.door.x && y === house.door.y;
+          world.tiles[y][x] = edgeWall && !isDoor ? 'houseWall' : 'grass';
+        }
+      }
+    }
+
     for (const npc of world.npcs) world.tiles[npc.y][npc.x] = 'grass';
     world.tiles[16][16] = 'grass';
   }
@@ -111,7 +126,8 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   }
 
   function blocked(x, y) {
-    return tileAt(x, y) === 'water';
+    const tile = tileAt(x, y);
+    return tile === 'water' || tile === 'houseWall';
   }
 
   function canStand(x, y) {
@@ -169,7 +185,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
       const x = player.x + cosA * dist;
       const y = player.y + sinA * dist;
       const tile = tileAt(x, y);
-      if (tile === 'water' || tile === 'rock' || tile === 'sand') {
+      if (tile === 'water' || tile === 'rock' || tile === 'sand' || tile === 'houseWall') {
         return { dist, tile };
       }
       dist += 0.04;
@@ -225,6 +241,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
       const bottom = centerY + wallHeight / 2;
       let hex = '#5a8f48';
       if (hit.tile === 'water') hex = '#3b8dca';
+      if (hit.tile === 'houseWall') hex = '#b88a63';
       const brightness = 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75;
       ctx.fillStyle = shade(hex, brightness);
       ctx.fillRect(x, top, 1, bottom - top + 1);
