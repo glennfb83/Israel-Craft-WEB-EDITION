@@ -55,12 +55,9 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const mctx = mini.getContext('2d');
   const status = document.getElementById('status');
   const dialog = document.getElementById('dialog');
+  const keys = Object.create(null);
   const dialogName = document.getElementById('dialog-name');
   const dialogText = document.getElementById('dialog-text');
-  const closeDialog = document.getElementById('close-dialog');
-  const talkButton = document.getElementById('talk');
-  const fullscreenButton = document.getElementById('fullscreen');
-  const keys = Object.create(null);
 
   const world = {
     size: 32,
@@ -80,13 +77,24 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 
   const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0 };
   const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
+  const FOV = Math.PI / 3;
+  const MAX_DEPTH = 20;
+
+  function resize() {
+    view.w = innerWidth;
+    view.h = innerHeight;
+    view.dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = view.w * view.dpr;
+    canvas.height = view.h * view.dpr;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  }
 
   function makeWorld() {
     for (let y = 0; y < world.size; y++) {
       world.tiles[y] = [];
       for (let x = 0; x < world.size; x++) {
-        const edge = x < 1 || y < 1 || x > world.size - 2 || y > world.size - 2;
-        const n = Math.sin(x * .7) + Math.cos(y * .55) + Math.sin((x + y) * .3);
+        const edge = x < 1 || y < 1 || x >= world.size - 1 || y >= world.size - 1;
+        const n = Math.sin(x * 0.7) + Math.cos(y * 0.55) + Math.sin((x + y) * 0.3);
         world.tiles[y][x] = edge ? 'water' : n < -1.25 ? 'rock' : n > 1.35 ? 'sand' : 'grass';
       }
     }
@@ -99,7 +107,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     const tx = Math.floor(x);
     const ty = Math.floor(y);
     if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) return 'water';
-    return world.tiles[ty][tx] || 'grass';
+    return world.tiles[ty]?.[tx] || 'grass';
   }
 
   function blocked(x, y) {
@@ -109,17 +117,6 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   function canStand(x, y) {
     const r = player.r;
     return !blocked(x - r, y - r) && !blocked(x + r, y - r) && !blocked(x - r, y + r) && !blocked(x + r, y + r);
-  }
-
-  function resize() {
-    view.w = innerWidth;
-    view.h = innerHeight;
-    view.dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = view.w * view.dpr;
-    canvas.height = view.h * view.dpr;
-    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-    mini.width = 150;
-    mini.height = 150;
   }
 
   function nearestNpc() {
@@ -147,6 +144,40 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     dialog.style.display = 'block';
   }
 
+  function hexToRgb(hex) {
+    const v = hex.replace('#', '');
+    const num = Number.parseInt(v, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255
+    };
+  }
+
+  function shade(hex, amount) {
+    const rgb = hexToRgb(hex);
+    const a = Math.max(0, Math.min(1, amount));
+    return `rgb(${Math.round(rgb.r * a)}, ${Math.round(rgb.g * a)}, ${Math.round(rgb.b * a)})`;
+  }
+
+  function castRay(angle, maxDepth = MAX_DEPTH) {
+    const sinA = Math.sin(angle);
+    const cosA = Math.cos(angle);
+    let dist = 0;
+
+    while (dist < maxDepth) {
+      const x = player.x + cosA * dist;
+      const y = player.y + sinA * dist;
+      const tile = tileAt(x, y);
+      if (tile === 'water' || tile === 'rock' || tile === 'sand') {
+        return { dist, tile };
+      }
+      dist += 0.04;
+    }
+
+    return { dist: maxDepth, tile: 'grass' };
+  }
+
   function drawMini() {
     const scale = mini.width / world.size;
     mctx.clearRect(0, 0, mini.width, mini.height);
@@ -156,12 +187,10 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
         mctx.fillRect(x * scale, y * scale, scale, scale);
       }
     }
-
     for (const npc of world.npcs) {
       mctx.fillStyle = '#ffd166';
       mctx.fillRect(npc.x * scale - 2, npc.y * scale - 2, 4, 4);
     }
-
     mctx.fillStyle = '#fff';
     mctx.fillRect(player.x * scale - 2, player.y * scale - 2, 4, 4);
   }
@@ -170,49 +199,44 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     const w = view.w;
     const h = view.h;
     const horizon = h * 0.43;
-
-    ctx.clearRect(0, 0, w, h);
-
-    ctx.fillStyle = '#6eb7df';
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, '#74c4ef');
+    sky.addColorStop(1, '#dff3ff');
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, horizon);
-    ctx.fillStyle = '#4a8f48';
+
+    const ground = ctx.createLinearGradient(0, horizon, 0, h);
+    ground.addColorStop(0, '#7da85d');
+    ground.addColorStop(1, '#3d5d2b');
+    ctx.fillStyle = ground;
     ctx.fillRect(0, horizon, w, h - horizon);
 
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(w / 2 - 7, horizon - 1, 14, 2);
+    const centerX = w / 2;
+    const centerY = horizon;
+    const range = Math.max(1, w);
+
+    for (let x = 0; x < w; x += 1) {
+      const rayAngle = player.angle - FOV / 2 + (x / range) * FOV;
+      const hit = castRay(rayAngle);
+      const corrected = hit.dist * Math.cos(rayAngle - player.angle);
+      const wallHeight = Math.min(h * 1.4, (h * 0.9) / Math.max(0.18, corrected));
+      const top = centerY - wallHeight / 2;
+      const bottom = centerY + wallHeight / 2;
+      let hex = '#5a8f48';
+      if (hit.tile === 'rock') hex = '#5b6470';
+      else if (hit.tile === 'sand') hex = '#d7b760';
+      else if (hit.tile === 'water') hex = '#3b8dca';
+      const brightness = 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75;
+      ctx.fillStyle = shade(hex, brightness);
+      ctx.fillRect(x, top, 1, bottom - top + 1);
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(centerX - 8, centerY - 1, 16, 2);
+    ctx.fillRect(centerX - 1, centerY - 8, 2, 16);
 
     const npc = nearestNpc();
-    const message = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
-    status.textContent = message;
-
-    const bounds = 6;
-    for (let y = Math.floor(player.y) - bounds; y <= Math.floor(player.y) + bounds; y++) {
-      for (let x = Math.floor(player.x) - bounds; x <= Math.floor(player.x) + bounds; x++) {
-        const tile = tileAt(x, y);
-        const px = (x - player.x) * 26;
-        const py = (y - player.y) * 26;
-        const distance = Math.hypot(px, py);
-        const screenX = w / 2 + (Math.cos(player.angle) * px - Math.sin(player.angle) * py) * 18;
-        const screenY = horizon + (Math.sin(player.angle) * px + Math.cos(player.angle) * py) * 18;
-        if (distance > 9) continue;
-        const size = Math.max(12, 32 - distance * 3);
-        ctx.fillStyle = tile === 'water' ? '#3696bd' : tile === 'sand' ? '#d9c57a' : '#5b9b4a';
-        ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
-      }
-    }
-
-    for (const npcData of world.npcs) {
-      const dx = npcData.x - player.x;
-      const dy = npcData.y - player.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 8) continue;
-      const worldX = Math.cos(player.angle) * dx - Math.sin(player.angle) * dy;
-      const worldY = Math.sin(player.angle) * dx + Math.cos(player.angle) * dy;
-      const sx = w / 2 + worldX * 18;
-      const sy = horizon + worldY * 18;
-      ctx.fillStyle = npcData.name === 'GlennFB' ? '#ffd166' : '#fefefe';
-      ctx.fillRect(sx - 5, sy - 5, 10, 10);
-    }
+    status.textContent = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
   }
 
   function move(dt) {
@@ -232,22 +256,17 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(event.key)) {
       event.preventDefault();
     }
-
     keys[event.code] = down;
-    if (down && (event.code === 'KeyE' || event.code === 'Space')) {
-      talk();
-    }
+    if (down && (event.code === 'KeyE' || event.code === 'Space')) talk();
   }
 
   function bindButtonMovement() {
     const mapping = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' };
-
     document.querySelectorAll('[data-move]').forEach(button => {
       const key = mapping[button.dataset.move];
       const setValue = value => {
         keys[key] = value;
       };
-
       button.addEventListener('pointerdown', event => {
         event.preventDefault();
         setValue(true);
@@ -283,16 +302,14 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     });
   }
 
-  function bindTalkUI() {
-    talkButton.addEventListener('click', talk);
-    closeDialog.addEventListener('click', () => {
+  function bindUI() {
+    document.getElementById('talk').addEventListener('click', talk);
+    document.getElementById('close-dialog').addEventListener('click', () => {
       dialog.style.display = 'none';
     });
-
-    fullscreenButton.addEventListener('click', () => {
-      const root = document.documentElement;
+    document.getElementById('fullscreen').addEventListener('click', () => {
       if (!document.fullscreenElement) {
-        root.requestFullscreen?.();
+        document.documentElement.requestFullscreen?.();
       } else {
         document.exitFullscreen?.();
       }
@@ -301,32 +318,19 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 
   window.addEventListener('keydown', event => handleKey(event, true));
   window.addEventListener('keyup', event => handleKey(event, false));
-  window.addEventListener('blur', () => {
-    Object.keys(keys).forEach(key => {
-      keys[key] = false;
-    });
-  });
+  window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
 
   bindButtonMovement();
   bindPointerLook();
-  bindTalkUI();
+  bindUI();
   makeWorld();
   resize();
+  window.addEventListener('resize', resize);
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      Object.keys(keys).forEach(key => {
-        keys[key] = false;
-      });
-      view.looking = false;
-    }
-  });
-
-  let lastTime = performance.now();
-
+  let last = performance.now();
   function loop(now) {
-    const dt = Math.min((now - lastTime) / 1000, 0.05);
-    lastTime = now;
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
     move(dt);
     draw();
     drawMini();
@@ -334,7 +338,6 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   }
 
   requestAnimationFrame(loop);
-  window.addEventListener('resize', resize);
 })();
 </script>
 </body>
