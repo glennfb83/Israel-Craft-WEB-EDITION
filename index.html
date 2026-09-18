@@ -199,7 +199,8 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     mctx.clearRect(0, 0, mini.width, mini.height);
     for (let y = 0; y < world.size; y++) {
       for (let x = 0; x < world.size; x++) {
-        mctx.fillStyle = tileAt(x, y) === 'water' ? '#3696bd' : '#5b9b4a';
+        const tile = tileAt(x, y);
+        mctx.fillStyle = tile === 'water' ? '#3696bd' : tile === 'houseWall' ? '#b88a63' : '#5b9b4a';
         mctx.fillRect(x * scale, y * scale, scale, scale);
       }
     }
