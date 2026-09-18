@@ -78,7 +78,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0 };
   const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
   const FOV = Math.PI / 3;
-  const MAX_DEPTH = 20;
+  const MAX_DEPTH = 48;
 
   function resize() {
     view.w = innerWidth;
@@ -228,6 +228,30 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
       const brightness = 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75;
       ctx.fillStyle = shade(hex, brightness);
       ctx.fillRect(x, top, 1, bottom - top + 1);
+    }
+
+    const visibleNpcs = world.npcs
+      .map(npc => {
+        const dx = npc.x - player.x;
+        const dy = npc.y - player.y;
+        const distance = Math.hypot(dx, dy);
+        let relativeAngle = Math.atan2(dy, dx) - player.angle;
+        while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
+        while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
+        return { npc, distance, relativeAngle };
+      })
+      .filter(item => item.distance < MAX_DEPTH && Math.abs(item.relativeAngle) < FOV / 2)
+      .sort((a, b) => b.distance - a.distance);
+
+    for (const item of visibleNpcs) {
+      const corrected = item.distance * Math.cos(item.relativeAngle);
+      const screenX = centerX + Math.tan(item.relativeAngle) / Math.tan(FOV / 2) * (w / 2);
+      const size = Math.max(10, Math.min(h * 0.8, (h * 0.9) / Math.max(0.18, corrected)));
+      const screenY = centerY + size * 0.28;
+      ctx.fillStyle = item.npc.name === 'GlennFB' ? '#ffd166' : '#fefefe';
+      ctx.fillRect(screenX - size * 0.16, screenY - size * 0.5, size * 0.32, size * 0.5);
+      ctx.fillStyle = '#26384b';
+      ctx.fillRect(screenX - size * 0.14, screenY - size * 0.64, size * 0.28, size * 0.16);
     }
 
     ctx.fillStyle = '#ffffff';
