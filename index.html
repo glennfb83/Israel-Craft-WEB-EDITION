@@ -5,15 +5,337 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>IsraelCraft 3D</title>
 <style>
-:root{--panel:#0b1726e8;--line:#ffffff38;--ink:#f7fbff;--gold:#ffd166}*{box-sizing:border-box}html,body,#app{width:100%;height:100%;margin:0;overflow:hidden}body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}#game{position:fixed;inset:0;width:100vw;height:100vh;touch-action:none}.panel{background:linear-gradient(145deg,#13243af2,#07111eef);border:1px solid var(--line);box-shadow:0 8px 27px #0007;backdrop-filter:blur(8px);border-radius:14px}#top{position:fixed;z-index:2;top:10px;left:10px;right:10px;display:flex}.brand{padding:8px 12px}.brand small,.brand strong{display:block}.brand strong{font-size:18px}#minimap{width:150px;height:150px;position:fixed;z-index:2;top:10px;right:10px;border:1px solid var(--line);border-radius:10px;background:#5b9b4a;image-rendering:pixelated}#status{position:fixed;z-index:2;top:76px;left:50%;transform:translateX(-50%);padding:8px 12px;text-align:center;max-width:calc(100% - 24px)}#dialog{display:none;position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));padding:14px}.dialog-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.dialog-head button{font-size:24px;background:none;border:0;color:#fff}.dialog-text{margin-top:10px;line-height:1.5}#bottom{position:fixed;z-index:2;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;gap:10px}.controls{display:flex;align-items:center;gap:10px;padding:10px}.move-pad{width:118px;height:92px;display:grid;grid-template:repeat(3,30px)/repeat(3,36px);justify-content:center;align-content:center}.move-pad button,button{color:#fff;background:#ffffff18;border:1px solid #ffffff35;border-radius:8px;padding:10px;cursor:pointer}.up{grid-area:1/2}.left{grid-area:2/1}.down{grid-area:2/2}.right{grid-area:2/3}.help{padding:10px;line-height:1.45}@media(max-width:650px){.help{display:none}#minimap{width:112px;height:112px}.controls{width:100%;justify-content:center}}
+:root{--panel:#0b1726e8;--line:#ffffff38;--ink:#f7fbff;--gold:#ffd166}
+*{box-sizing:border-box}
+html,body,#app{width:100%;height:100%;margin:0;overflow:hidden}
+body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
+#game{position:fixed;inset:0;width:100vw;height:100vh;touch-action:none}
+.panel{background:linear-gradient(145deg,#13243af2,#07111eef);border:1px solid var(--line);box-shadow:0 8px 27px #0007;backdrop-filter:blur(8px);border-radius:14px}
+#top{position:fixed;z-index:2;top:10px;left:10px;right:10px;display:flex}.brand{padding:8px 12px}.brand small,.brand strong{display:block}.brand strong{font-size:18px}
+#minimap{width:150px;height:150px;position:fixed;z-index:2;top:110px;right:10px;border:1px solid var(--line);border-radius:14px;background:#5b9b4a;image-rendering:pixelated}
+#status{position:fixed;z-index:2;top:76px;left:50%;transform:translateX(-50%);padding:8px 12px;text-align:center;max-width:calc(100% - 24px)}
+#dialog{display:none;position:fixed;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100% - 32px));padding:14px}
+.dialog-head{display:flex;justify-content:space-between;align-items:center;font-weight:700}.dialog-head button{font-size:24px;background:none;border:0;color:#fff}.dialog-text{margin-top:10px;line-height:1.5}
+#bottom{position:fixed;z-index:2;bottom:10px;left:10px;right:10px;display:flex;justify-content:space-between;align-items:end;gap:10px}
+.controls{display:flex;align-items:center;gap:10px;padding:10px}
+.move-pad{width:118px;height:92px;display:grid;grid-template:repeat(3,30px)/repeat(3,30px);justify-content:center;align-content:center}
+.move-pad button,button{color:#fff;background:#ffffff18;border:1px solid #ffffff35;border-radius:8px;padding:10px;cursor:pointer}
+.up{grid-area:1/2}.left{grid-area:2/1}.down{grid-area:2/2}.right{grid-area:2/3}.help{padding:10px;line-height:1.45}
+@media (max-width:650px){.help{display:none}#minimap{width:112px;height:112px}.controls{width:100%;justify-content:center}}
 </style>
 </head>
-<body><div id="app">
+<body>
+<div id="app">
 <canvas id="game" aria-label="IsraelCraft 3D village game"></canvas>
-<header id="top"><div class="panel brand"><small>⛏️ IsraelCraft</small><strong>3D NPC Village</strong></div></header><canvas id="minimap" width="150" height="150" aria-label="Village minimap"></canvas>
+<header id="top"><div class="panel brand"><small>⛏️ IsraelCraft</small><strong>3D NPC Village</strong></div></header>
+<canvas id="minimap" width="150" height="150" aria-label="Village minimap"></canvas>
 <div id="status" class="panel">WASD / arrows move · drag to look · E or Space talks</div>
 <div id="dialog" class="panel"><div class="dialog-head"><span id="dialog-name"></span><button id="close-dialog">×</button></div><div class="dialog-text" id="dialog-text"></div></div>
-<footer id="bottom"><div class="panel controls"><div class="move-pad"><button class="up" data-move="up">▲</button><button class="left" data-move="left">◀</button><button class="down" data-move="down">▼</button><button class="right" data-move="right">▶</button></div><button id="talk">💬 Talk</button><button id="fullscreen">⛶ Fullscreen</button></div><div class="panel help"><b>Move:</b> WASD / arrows<br><b>Talk:</b> E, Space, or button</div></footer>
-</div><script>
-(()=>{'use strict';const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),mini=document.getElementById('minimap'),mctx=mini.getContext('2d'),status=document.getElementById('status'),dialog=document.getElementById('dialog'),keys=Object.create(null);const world={size:32,tiles:[],npcs:[{name:'Flippy',x:8,y:8,line:'Going flippy? To be frank, happens to the best of us.'},{name:'Frank',x:24,y:13,line:'The village is quiet when the wind is kind.'},{name:'Maya',x:16,y:24,line:'Welcome to IsraelCraft! The whole map is yours to explore.'},{name:'Rafi',x:20,y:12,line:'The market gets louder before sunset.'},{name:'Nina',x:23,y:19,line:'The path is safest when you take it slowly.'},{name:'goon_king69',x:4,y:12,line:'Keep it flippy, keep it frank—the crown is wobbling, but the vibe is strong.'},{name:'GlennFB',x:28,y:8,line:'Frankly, the flippiest path is usually the most fun one.'},{name:'Pierson562/Big P',x:6,y:22,line:'Big P says: go flippy, stay frank, and never let the village get boring.'},{name:'margit_the_f3ll',x:26,y:25,line:'A flippy frank greeting to you. Even the fell can find a good adventure here.'}]};const player={x:16.5,y:16.5,r:.27,speed:4.8,angle:0};let view={w:innerWidth,h:innerHeight,dpr:1},looking=false,lastX=0;function resize(){view.w=innerWidth;view.h=innerHeight;view.dpr=Math.min(devicePixelRatio||1,2);canvas.width=view.w*view.dpr;canvas.height=view.h*view.dpr;ctx.setTransform(view.dpr,0,0,view.dpr,0,0)}function makeWorld(){for(let y=0;y<world.size;y++){world.tiles[y]=[];for(let x=0;x<world.size;x++){const edge=x<1||y<1||x>=world.size-1||y>=world.size-1,n=Math.sin(x*.7)+Math.cos(y*.55)+Math.sin((x+y)*.3);world.tiles[y][x]=edge?'water':n<-1.25?'rock':n>1.35?'sand':'grass'}}for(const n of world.npcs)world.tiles[n.y][n.x]='grass';world.tiles[16][16]='grass'}function tileAt(x,y){return world.tiles[Math.floor(y)]?.[Math.floor(x)]||'grass'}function blocked(x,y){return tileAt(x,y)==='water'}function canStand(x,y){const r=player.r;return !blocked(x-r,y-r)&&!blocked(x+r,y-r)&&!blocked(x-r,y+r)&&!blocked(x+r,y+r)}function move(dt){const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0),s=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);if(!f&&!s)return;const len=Math.hypot(f,s)||1,dx=Math.cos(player.angle)*f/len*player.speed*dt-Math.sin(player.angle)*s/len*player.speed*dt,dy=Math.sin(player.angle)*f/len*player.speed*dt+Math.cos(player.angle)*s/len*player.speed*dt;if(canStand(player.x+dx,player.y))player.x+=dx;if(canStand(player.x,player.y+dy))player.y+=dy}function nearest(){let best=null,d=2.2;for(const n of world.npcs){const q=Math.hypot(player.x-n.x,player.y-n.y);if(q<d){d=q;best=n}}return best}function talk(){const n=nearest();if(!n){status.textContent='Move closer to an NPC to talk.';return}document.getElementById('dialog-name').textContent=n.name;document.getElementById('dialog-text').textContent=n.line;dialog.style.display='block'}function drawMini(){const scale=mini.width/world.size;mctx.clearRect(0,0,mini.width,mini.height);for(let y=0;y<world.size;y++)for(let x=0;x<world.size;x++){mctx.fillStyle=tileAt(x,y)==='water'?'#3696bd':'#5b9b4a';mctx.fillRect(x*scale,y*scale,scale,scale)}for(const n of world.npcs){mctx.fillStyle='#ffd166';mctx.fillRect(n.x*scale-2,n.y*scale-2,4,4)}mctx.fillStyle='#fff';mctx.fillRect(player.x*scale-2,player.y*scale-2,4,4)}function draw(){const w=view.w,h=view.h,horizon=h*.43;ctx.fillStyle='#6eb7df';ctx.fillRect(0,0,w,horizon);ctx.fillStyle='#5a8f48';ctx.fillRect(0,horizon,w,h-horizon);ctx.fillStyle='#fff';ctx.fillRect(w/2-7,horizon-1,14,2);const n=nearest();status.textContent=n?'E or Space talks to '+n.name:'WASD / arrows move · drag to look · E or Space talks'}function key(e,down){if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Spacebar'].includes(e.key))e.preventDefault();keys[e.code]=down;if(down&&(e.code==='KeyE'||e.code==='Space'))talk()}addEventListener('keydown',e=>key(e,true));addEventListener('keyup',e=>key(e,false));addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));const dirs={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'};document.querySelectorAll('[data-move]').forEach(b=>{const c=dirs[b.dataset.move],set=v=>e=>{e.preventDefault();keys[c]=v};b.addEventListener('pointerdown',set(true));['pointerup','pointercancel','pointerleave'].forEach(x=>b.addEventListener(x,set(false)))});canvas.addEventListener('pointerdown',e=>{looking=true;lastX=e.clientX;canvas.setPointerCapture?.(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(looking){player.angle+=(e.clientX-lastX)*.006;lastX=e.clientX}});['pointerup','pointerleave','pointercancel'].forEach(x=>canvas.addEventListener(x,()=>looking=false));document.getElementById('talk').onclick=talk;document.getElementById('close-dialog').onclick=()=>dialog.style.display='none';document.getElementById('fullscreen').onclick=()=>document.documentElement.requestFullscreen?.();makeWorld();resize();addEventListener('resize',resize);let last=performance.now();function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;move(dt);draw();drawMini();requestAnimationFrame(loop)}requestAnimationFrame(loop)})();
-</script></body></html>
+<footer id="bottom">
+<div class="panel controls">
+<div class="move-pad">
+<button class="up" data-move="up">▲</button>
+<button class="left" data-move="left">◀</button>
+<button class="down" data-move="down">▼</button>
+<button class="right" data-move="right">▶</button>
+</div>
+<button id="talk">💬 Talk</button>
+<button id="fullscreen">⛶ Fullscreen</button>
+</div>
+<div class="panel help"><b>Move:</b> WASD / arrows<br><b>Talk:</b> E, Space, or button</div>
+</footer>
+</div>
+<script>
+(() => {
+  'use strict';
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const mini = document.getElementById('minimap');
+  const mctx = mini.getContext('2d');
+  const status = document.getElementById('status');
+  const dialog = document.getElementById('dialog');
+  const dialogName = document.getElementById('dialog-name');
+  const dialogText = document.getElementById('dialog-text');
+  const closeDialog = document.getElementById('close-dialog');
+  const talkButton = document.getElementById('talk');
+  const fullscreenButton = document.getElementById('fullscreen');
+  const keys = Object.create(null);
+
+  const world = {
+    size: 32,
+    tiles: [],
+    npcs: [
+      { name: 'Flippy', x: 8, y: 8, line: 'Going flippy? To be frank, happens to the best of us.' },
+      { name: 'Frank', x: 24, y: 13, line: 'The village is quiet when the wind is kind.' },
+      { name: 'Maya', x: 16, y: 24, line: 'Welcome to IsraelCraft! The whole map is yours to explore.' },
+      { name: 'Rafi', x: 20, y: 12, line: 'The market gets louder before sunset.' },
+      { name: 'Nina', x: 23, y: 19, line: 'The path is safest when you take it slowly.' },
+      { name: 'goon_king69', x: 4, y: 12, line: 'Keep it flippy, keep it frank—the crown is wobbling, but the vibe is strong.' },
+      { name: 'GlennFB', x: 28, y: 8, line: 'Frankly, the flippiest path is usually the most fun one.' },
+      { name: 'Person562/Big P', x: 6, y: 22, line: 'Big P says: go flippy, stay frank, and never let the village get boring.' },
+      { name: 'margit_the_f3ll', x: 26, y: 25, line: 'A flippy frank greeting to you. Even the fell can find a good adventure here.' }
+    ]
+  };
+
+  const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0 };
+  const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
+
+  function makeWorld() {
+    for (let y = 0; y < world.size; y++) {
+      world.tiles[y] = [];
+      for (let x = 0; x < world.size; x++) {
+        const edge = x < 1 || y < 1 || x > world.size - 2 || y > world.size - 2;
+        const n = Math.sin(x * .7) + Math.cos(y * .55) + Math.sin((x + y) * .3);
+        world.tiles[y][x] = edge ? 'water' : n < -1.25 ? 'rock' : n > 1.35 ? 'sand' : 'grass';
+      }
+    }
+
+    for (const npc of world.npcs) world.tiles[npc.y][npc.x] = 'grass';
+    world.tiles[16][16] = 'grass';
+  }
+
+  function tileAt(x, y) {
+    const tx = Math.floor(x);
+    const ty = Math.floor(y);
+    if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) return 'water';
+    return world.tiles[ty][tx] || 'grass';
+  }
+
+  function blocked(x, y) {
+    return tileAt(x, y) === 'water';
+  }
+
+  function canStand(x, y) {
+    const r = player.r;
+    return !blocked(x - r, y - r) && !blocked(x + r, y - r) && !blocked(x - r, y + r) && !blocked(x + r, y + r);
+  }
+
+  function resize() {
+    view.w = innerWidth;
+    view.h = innerHeight;
+    view.dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = view.w * view.dpr;
+    canvas.height = view.h * view.dpr;
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    mini.width = 150;
+    mini.height = 150;
+  }
+
+  function nearestNpc() {
+    let best = null;
+    let d = 2.2;
+    for (const npc of world.npcs) {
+      const q = Math.hypot(player.x - npc.x, player.y - npc.y);
+      if (q < d) {
+        d = q;
+        best = npc;
+      }
+    }
+    return best;
+  }
+
+  function talk() {
+    const npc = nearestNpc();
+    if (!npc) {
+      status.textContent = 'Move closer to an NPC to talk.';
+      return;
+    }
+
+    dialogName.textContent = npc.name;
+    dialogText.textContent = npc.line;
+    dialog.style.display = 'block';
+  }
+
+  function drawMini() {
+    const scale = mini.width / world.size;
+    mctx.clearRect(0, 0, mini.width, mini.height);
+    for (let y = 0; y < world.size; y++) {
+      for (let x = 0; x < world.size; x++) {
+        mctx.fillStyle = tileAt(x, y) === 'water' ? '#3696bd' : '#5b9b4a';
+        mctx.fillRect(x * scale, y * scale, scale, scale);
+      }
+    }
+
+    for (const npc of world.npcs) {
+      mctx.fillStyle = '#ffd166';
+      mctx.fillRect(npc.x * scale - 2, npc.y * scale - 2, 4, 4);
+    }
+
+    mctx.fillStyle = '#fff';
+    mctx.fillRect(player.x * scale - 2, player.y * scale - 2, 4, 4);
+  }
+
+  function draw() {
+    const w = view.w;
+    const h = view.h;
+    const horizon = h * 0.43;
+
+    ctx.clearRect(0, 0, w, h);
+
+    ctx.fillStyle = '#6eb7df';
+    ctx.fillRect(0, 0, w, horizon);
+    ctx.fillStyle = '#4a8f48';
+    ctx.fillRect(0, horizon, w, h - horizon);
+
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(w / 2 - 7, horizon - 1, 14, 2);
+
+    const npc = nearestNpc();
+    const message = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
+    status.textContent = message;
+
+    const bounds = 6;
+    for (let y = Math.floor(player.y) - bounds; y <= Math.floor(player.y) + bounds; y++) {
+      for (let x = Math.floor(player.x) - bounds; x <= Math.floor(player.x) + bounds; x++) {
+        const tile = tileAt(x, y);
+        const px = (x - player.x) * 26;
+        const py = (y - player.y) * 26;
+        const distance = Math.hypot(px, py);
+        const screenX = w / 2 + (Math.cos(player.angle) * px - Math.sin(player.angle) * py) * 18;
+        const screenY = horizon + (Math.sin(player.angle) * px + Math.cos(player.angle) * py) * 18;
+        if (distance > 9) continue;
+        const size = Math.max(12, 32 - distance * 3);
+        ctx.fillStyle = tile === 'water' ? '#3696bd' : tile === 'sand' ? '#d9c57a' : '#5b9b4a';
+        ctx.fillRect(screenX - size / 2, screenY - size / 2, size, size);
+      }
+    }
+
+    for (const npcData of world.npcs) {
+      const dx = npcData.x - player.x;
+      const dy = npcData.y - player.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 8) continue;
+      const worldX = Math.cos(player.angle) * dx - Math.sin(player.angle) * dy;
+      const worldY = Math.sin(player.angle) * dx + Math.cos(player.angle) * dy;
+      const sx = w / 2 + worldX * 18;
+      const sy = horizon + worldY * 18;
+      ctx.fillStyle = npcData.name === 'GlennFB' ? '#ffd166' : '#fefefe';
+      ctx.fillRect(sx - 5, sy - 5, 10, 10);
+    }
+  }
+
+  function move(dt) {
+    const forward = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+    const strafe = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+    if (!forward && !strafe) return;
+
+    const len = Math.hypot(forward, strafe) || 1;
+    const dx = (Math.cos(player.angle) * forward - Math.sin(player.angle) * strafe) / len * player.speed * dt;
+    const dy = (Math.sin(player.angle) * forward + Math.cos(player.angle) * strafe) / len * player.speed * dt;
+
+    if (canStand(player.x + dx, player.y)) player.x += dx;
+    if (canStand(player.x, player.y + dy)) player.y += dy;
+  }
+
+  function handleKey(event, down) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(event.key)) {
+      event.preventDefault();
+    }
+
+    keys[event.code] = down;
+    if (down && (event.code === 'KeyE' || event.code === 'Space')) {
+      talk();
+    }
+  }
+
+  function bindButtonMovement() {
+    const mapping = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' };
+
+    document.querySelectorAll('[data-move]').forEach(button => {
+      const key = mapping[button.dataset.move];
+      const setValue = value => {
+        keys[key] = value;
+      };
+
+      button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        setValue(true);
+      });
+      button.addEventListener('pointerup', event => {
+        event.preventDefault();
+        setValue(false);
+      });
+      button.addEventListener('pointerleave', () => setValue(false));
+      button.addEventListener('pointercancel', () => setValue(false));
+    });
+  }
+
+  function bindPointerLook() {
+    canvas.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      view.looking = true;
+      view.lastX = event.clientX;
+      if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', event => {
+      if (!view.looking) return;
+      const dx = event.clientX - view.lastX;
+      player.angle += dx * 0.006;
+      view.lastX = event.clientX;
+    });
+
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => {
+      canvas.addEventListener(type, () => {
+        view.looking = false;
+      });
+    });
+  }
+
+  function bindTalkUI() {
+    talkButton.addEventListener('click', talk);
+    closeDialog.addEventListener('click', () => {
+      dialog.style.display = 'none';
+    });
+
+    fullscreenButton.addEventListener('click', () => {
+      const root = document.documentElement;
+      if (!document.fullscreenElement) {
+        root.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    });
+  }
+
+  window.addEventListener('keydown', event => handleKey(event, true));
+  window.addEventListener('keyup', event => handleKey(event, false));
+  window.addEventListener('blur', () => {
+    Object.keys(keys).forEach(key => {
+      keys[key] = false;
+    });
+  });
+
+  bindButtonMovement();
+  bindPointerLook();
+  bindTalkUI();
+  makeWorld();
+  resize();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      Object.keys(keys).forEach(key => {
+        keys[key] = false;
+      });
+      view.looking = false;
+    }
+  });
+
+  let lastTime = performance.now();
+
+  function loop(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    move(dt);
+    draw();
+    drawMini();
+    requestAnimationFrame(loop);
+  }
+
+  requestAnimationFrame(loop);
+  window.addEventListener('resize', resize);
+})();
+</script>
+</body>
+</html>
