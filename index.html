@@ -42,13 +42,12 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 <button id="talk">💬 Talk</button>
 <button id="fullscreen">⛶ Fullscreen</button>
 </div>
-<div class="panel help"><b>Move:</b> WASD / arrows<br><b>Talk:</b> E, Space, or button</div>
+<div class="panel help"><b>Move:</b> WASD / arrows<br><b>Talk:</b> E, Space, or button<br><b>Apples:</b> E / Space near a tree, then eat</div>
 </footer>
 </div>
 <script>
 (() => {
   'use strict';
-
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
   const mini = document.getElementById('minimap');
@@ -58,15 +57,14 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const keys = Object.create(null);
   const dialogName = document.getElementById('dialog-name');
   const dialogText = document.getElementById('dialog-text');
-
   const world = {
-    size: 32,
-    tiles: [],
+    size: 32, tiles: [],
     houses: [
       { x: 6, y: 6, w: 5, h: 5, door: { x: 8, y: 10 } },
       { x: 20, y: 7, w: 5, h: 5, door: { x: 22, y: 11 } },
       { x: 12, y: 22, w: 6, h: 5, door: { x: 15, y: 26 } }
     ],
+    trees: [{ x: 3, y: 5, apples: 3 }, { x: 27, y: 5, apples: 3 }, { x: 4, y: 27, apples: 3 }, { x: 28, y: 23, apples: 3 }],
     npcs: [
       { name: 'Flippy', x: 8, y: 8, line: 'Going flippy? To be frank, happens to the best of us.' },
       { name: 'Frank', x: 24, y: 13, line: 'The village is quiet when the wind is kind.' },
@@ -79,306 +77,47 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
       { name: 'margit_the_f3ll', x: 26, y: 25, line: 'A flippy frank greeting to you. Even the fell can find a good adventure here.' }
     ]
   };
-
-  const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0 };
+  const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0, apples: 0 };
   const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
-  const FOV = Math.PI / 3;
-  const MAX_DEPTH = 48;
-
-  function resize() {
-    view.w = innerWidth;
-    view.h = innerHeight;
-    view.dpr = Math.min(devicePixelRatio || 1, 2);
-    canvas.width = view.w * view.dpr;
-    canvas.height = view.h * view.dpr;
-    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-  }
-
+  const FOV = Math.PI / 3, MAX_DEPTH = 48;
+  function resize() { view.w = innerWidth; view.h = innerHeight; view.dpr = Math.min(devicePixelRatio || 1, 2); canvas.width = view.w * view.dpr; canvas.height = view.h * view.dpr; ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0); }
   function makeWorld() {
-    for (let y = 0; y < world.size; y++) {
-      world.tiles[y] = [];
-      for (let x = 0; x < world.size; x++) {
-        const edge = x < 1 || y < 1 || x >= world.size - 1 || y >= world.size - 1;
-        const n = Math.sin(x * 0.7) + Math.cos(y * 0.55) + Math.sin((x + y) * 0.3);
-        world.tiles[y][x] = edge ? 'water' : n < -1.25 ? 'rock' : n > 1.35 ? 'sand' : 'grass';
-      }
-    }
-
-    for (const house of world.houses) {
-      for (let y = house.y; y < house.y + house.h; y++) {
-        for (let x = house.x; x < house.x + house.w; x++) {
-          const edgeWall = x === house.x || x === house.x + house.w - 1 || y === house.y || y === house.y + house.h - 1;
-          const isDoor = x === house.door.x && y === house.door.y;
-          world.tiles[y][x] = edgeWall && !isDoor ? 'houseWall' : 'grass';
-        }
-      }
-    }
-
-    for (const npc of world.npcs) world.tiles[npc.y][npc.x] = 'grass';
-    world.tiles[16][16] = 'grass';
+    for (let y = 0; y < world.size; y++) { world.tiles[y] = []; for (let x = 0; x < world.size; x++) { const edge = x < 1 || y < 1 || x >= world.size - 1 || y >= world.size - 1; const n = Math.sin(x * 0.7) + Math.cos(y * 0.55) + Math.sin((x + y) * 0.3); world.tiles[y][x] = edge ? 'water' : n < -1.25 ? 'rock' : n > 1.35 ? 'sand' : 'grass'; } }
+    for (const house of world.houses) for (let y = house.y; y < house.y + house.h; y++) for (let x = house.x; x < house.x + house.w; x++) { const edgeWall = x === house.x || x === house.x + house.w - 1 || y === house.y || y === house.y + house.h - 1; const isDoor = x === house.door.x && y === house.door.y; world.tiles[y][x] = edgeWall && !isDoor ? 'houseWall' : 'grass'; }
+    for (const tree of world.trees) world.tiles[tree.y][tree.x] = 'tree';
+    for (const npc of world.npcs) world.tiles[npc.y][npc.x] = 'grass'; world.tiles[16][16] = 'grass';
   }
-
-  function tileAt(x, y) {
-    const tx = Math.floor(x);
-    const ty = Math.floor(y);
-    if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) return 'water';
-    return world.tiles[ty]?.[tx] || 'grass';
-  }
-
-  function blocked(x, y) {
-    const tile = tileAt(x, y);
-    return tile === 'water' || tile === 'houseWall';
-  }
-
-  function canStand(x, y) {
-    const r = player.r;
-    return !blocked(x - r, y - r) && !blocked(x + r, y - r) && !blocked(x - r, y + r) && !blocked(x + r, y + r);
-  }
-
-  function nearestNpc() {
-    let best = null;
-    let d = 2.2;
-    for (const npc of world.npcs) {
-      const q = Math.hypot(player.x - npc.x, player.y - npc.y);
-      if (q < d) {
-        d = q;
-        best = npc;
-      }
-    }
-    return best;
-  }
-
-  function talk() {
-    const npc = nearestNpc();
-    if (!npc) {
-      status.textContent = 'Move closer to an NPC to talk.';
-      return;
-    }
-
-    dialogName.textContent = npc.name;
-    dialogText.textContent = npc.line;
-    dialog.style.display = 'block';
-  }
-
-  function hexToRgb(hex) {
-    const v = hex.replace('#', '');
-    const num = Number.parseInt(v, 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255
-    };
-  }
-
-  function shade(hex, amount) {
-    const rgb = hexToRgb(hex);
-    const a = Math.max(0, Math.min(1, amount));
-    return `rgb(${Math.round(rgb.r * a)}, ${Math.round(rgb.g * a)}, ${Math.round(rgb.b * a)})`;
-  }
-
-  function castRay(angle, maxDepth = MAX_DEPTH) {
-    const sinA = Math.sin(angle);
-    const cosA = Math.cos(angle);
-    let dist = 0;
-
-    while (dist < maxDepth) {
-      const x = player.x + cosA * dist;
-      const y = player.y + sinA * dist;
-      const tile = tileAt(x, y);
-      if (tile === 'water' || tile === 'rock' || tile === 'sand' || tile === 'houseWall') {
-        return { dist, tile };
-      }
-      dist += 0.04;
-    }
-
-    return { dist: maxDepth, tile: 'grass' };
-  }
-
-  function drawMini() {
-    const scale = mini.width / world.size;
-    mctx.clearRect(0, 0, mini.width, mini.height);
-    for (let y = 0; y < world.size; y++) {
-      for (let x = 0; x < world.size; x++) {
-        const tile = tileAt(x, y);
-        mctx.fillStyle = tile === 'water' ? '#3696bd' : tile === 'houseWall' ? '#b88a63' : '#5b9b4a';
-        mctx.fillRect(x * scale, y * scale, scale, scale);
-      }
-    }
-    for (const npc of world.npcs) {
-      mctx.fillStyle = '#ffd166';
-      mctx.fillRect(npc.x * scale - 2, npc.y * scale - 2, 4, 4);
-    }
-    mctx.fillStyle = '#fff';
-    mctx.fillRect(player.x * scale - 2, player.y * scale - 2, 4, 4);
-  }
-
+  function tileAt(x, y) { const tx = Math.floor(x), ty = Math.floor(y); if (tx < 0 || ty < 0 || tx >= world.size || ty >= world.size) return 'water'; return world.tiles[ty]?.[tx] || 'grass'; }
+  function blocked(x, y) { const tile = tileAt(x, y); return tile === 'water' || tile === 'houseWall' || tile === 'tree'; }
+  function canStand(x, y) { const r = player.r; return !blocked(x - r, y - r) && !blocked(x + r, y - r) && !blocked(x - r, y + r) && !blocked(x + r, y + r); }
+  function nearestNpc() { let best = null, d = 2.2; for (const npc of world.npcs) { const q = Math.hypot(player.x - npc.x, player.y - npc.y); if (q < d) { d = q; best = npc; } } return best; }
+  function nearestTree() { let best = null, d = 2.2; for (const tree of world.trees) { const q = Math.hypot(player.x - tree.x, player.y - tree.y); if (q < d) { d = q; best = tree; } } return best; }
+  function interact() { const tree = nearestTree(); if (tree && tree.apples > 0 && player.apples === 0) { tree.apples--; player.apples++; status.textContent = 'Picked an apple. Press E / Space again to eat it.'; return; } if (player.apples > 0) { player.apples--; status.textContent = `You ate an apple. ${player.apples} left.`; return; } if (tree) { status.textContent = 'This tree has no apples left.'; return; } talk(); }
+  function talk() { const npc = nearestNpc(); if (!npc) { status.textContent = 'Move closer to an NPC to talk.'; return; } dialogName.textContent = npc.name; dialogText.textContent = npc.line; dialog.style.display = 'block'; }
+  function hexToRgb(hex) { const v = hex.replace('#', ''), num = Number.parseInt(v, 16); return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }; }
+  function shade(hex, amount) { const rgb = hexToRgb(hex), a = Math.max(0, Math.min(1, amount)); return `rgb(${Math.round(rgb.r * a)}, ${Math.round(rgb.g * a)}, ${Math.round(rgb.b * a)})`; }
+  function castRay(angle, maxDepth = MAX_DEPTH) { const sinA = Math.sin(angle), cosA = Math.cos(angle); let dist = 0; while (dist < maxDepth) { const tile = tileAt(player.x + cosA * dist, player.y + sinA * dist); if (tile === 'water' || tile === 'rock' || tile === 'sand' || tile === 'houseWall' || tile === 'tree') return { dist, tile }; dist += 0.04; } return { dist: maxDepth, tile: 'grass' }; }
+  function drawMini() { const scale = mini.width / world.size; mctx.clearRect(0, 0, mini.width, mini.height); for (let y = 0; y < world.size; y++) for (let x = 0; x < world.size; x++) { const tile = tileAt(x, y); mctx.fillStyle = tile === 'water' ? '#3696bd' : tile === 'houseWall' ? '#b88a63' : '#5b9b4a'; mctx.fillRect(x * scale, y * scale, scale, scale); } for (const tree of world.trees) { mctx.fillStyle = '#245c2a'; mctx.fillRect(tree.x * scale - 3, tree.y * scale - 3, 6, 6); mctx.fillStyle = tree.apples > 0 ? '#e74c3c' : '#6b8f52'; mctx.fillRect(tree.x * scale - 1, tree.y * scale - 1, 2, 2); } for (const npc of world.npcs) { mctx.fillStyle = '#ffd166'; mctx.fillRect(npc.x * scale - 2, npc.y * scale - 2, 4, 4); } mctx.fillStyle = '#fff'; mctx.fillRect(player.x * scale - 2, player.y * scale - 2, 4, 4); }
   function draw() {
-    const w = view.w;
-    const h = view.h;
-    const horizon = h * 0.43;
-    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
-    sky.addColorStop(0, '#74c4ef');
-    sky.addColorStop(1, '#dff3ff');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, horizon);
-
-    const ground = ctx.createLinearGradient(0, horizon, 0, h);
-    ground.addColorStop(0, '#7da85d');
-    ground.addColorStop(1, '#3d5d2b');
-    ctx.fillStyle = ground;
-    ctx.fillRect(0, horizon, w, h - horizon);
-
-    const centerX = w / 2;
-    const centerY = horizon;
-    const range = Math.max(1, w);
-
-    for (let x = 0; x < w; x += 1) {
-      const rayAngle = player.angle - FOV / 2 + (x / range) * FOV;
-      const hit = castRay(rayAngle);
-      if (hit.tile === 'rock' || hit.tile === 'sand') continue;
-      const corrected = hit.dist * Math.cos(rayAngle - player.angle);
-      const wallHeight = Math.min(h * 1.4, (h * 0.9) / Math.max(0.18, corrected));
-      const top = centerY - wallHeight / 2;
-      const bottom = centerY + wallHeight / 2;
-      let hex = '#5a8f48';
-      if (hit.tile === 'water') hex = '#3b8dca';
-      if (hit.tile === 'houseWall') hex = '#b88a63';
-      const brightness = 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75;
-      ctx.fillStyle = shade(hex, brightness);
-      ctx.fillRect(x, top, 1, bottom - top + 1);
-    }
-
-    const visibleNpcs = world.npcs
-      .map(npc => {
-        const dx = npc.x - player.x;
-        const dy = npc.y - player.y;
-        const distance = Math.hypot(dx, dy);
-        let relativeAngle = Math.atan2(dy, dx) - player.angle;
-        while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
-        while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
-        return { npc, distance, relativeAngle };
-      })
-      .filter(item => item.distance < MAX_DEPTH && Math.abs(item.relativeAngle) < FOV / 2)
-      .sort((a, b) => b.distance - a.distance);
-
-    for (const item of visibleNpcs) {
-      const corrected = item.distance * Math.cos(item.relativeAngle);
-      const screenX = centerX + Math.tan(item.relativeAngle) / Math.tan(FOV / 2) * (w / 2);
-      const size = Math.max(10, Math.min(h * 0.8, (h * 0.9) / Math.max(0.18, corrected)));
-      const screenY = centerY + size * 0.28;
-      ctx.fillStyle = item.npc.name === 'GlennFB' ? '#ffd166' : '#fefefe';
-      ctx.fillRect(screenX - size * 0.16, screenY - size * 0.5, size * 0.32, size * 0.5);
-      ctx.fillStyle = '#26384b';
-      ctx.fillRect(screenX - size * 0.14, screenY - size * 0.64, size * 0.28, size * 0.16);
-    }
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(centerX - 8, centerY - 1, 16, 2);
-    ctx.fillRect(centerX - 1, centerY - 8, 2, 16);
-
-    const npc = nearestNpc();
-    status.textContent = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
+    const w = view.w, h = view.h, horizon = h * 0.43, sky = ctx.createLinearGradient(0, 0, 0, horizon); sky.addColorStop(0, '#74c4ef'); sky.addColorStop(1, '#dff3ff'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, horizon);
+    const ground = ctx.createLinearGradient(0, horizon, 0, h); ground.addColorStop(0, '#7da85d'); ground.addColorStop(1, '#3d5d2b'); ctx.fillStyle = ground; ctx.fillRect(0, horizon, w, h - horizon);
+    const centerX = w / 2, centerY = horizon, range = Math.max(1, w);
+    for (let x = 0; x < w; x++) { const rayAngle = player.angle - FOV / 2 + (x / range) * FOV, hit = castRay(rayAngle); if (hit.tile === 'rock' || hit.tile === 'sand') continue; const corrected = hit.dist * Math.cos(rayAngle - player.angle), wallHeight = Math.min(h * 1.4, (h * 0.9) / Math.max(0.18, corrected)), top = centerY - wallHeight / 2, bottom = centerY + wallHeight / 2; let hex = hit.tile === 'water' ? '#3b8dca' : hit.tile === 'houseWall' ? '#b88a63' : hit.tile === 'tree' ? '#2f6b31' : '#5a8f48'; ctx.fillStyle = shade(hex, 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75); ctx.fillRect(x, top, 1, bottom - top + 1); }
+    const visibleTrees = world.trees.map(tree => { const dx = tree.x - player.x, dy = tree.y - player.y, distance = Math.hypot(dx, dy); let relativeAngle = Math.atan2(dy, dx) - player.angle; while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2; while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2; return { tree, distance, relativeAngle }; }).filter(item => item.distance < MAX_DEPTH && Math.abs(item.relativeAngle) < FOV / 2).sort((a, b) => b.distance - a.distance);
+    for (const item of visibleTrees) { const corrected = item.distance * Math.cos(item.relativeAngle), screenX = centerX + Math.tan(item.relativeAngle) / Math.tan(FOV / 2) * (w / 2), size = Math.max(12, Math.min(h * 0.8, (h * 0.9) / Math.max(0.18, corrected))), screenY = centerY + size * 0.3; ctx.fillStyle = '#70452b'; ctx.fillRect(screenX - size * 0.07, screenY - size * 0.25, size * 0.14, size * 0.55); ctx.fillStyle = '#286b31'; ctx.beginPath(); ctx.arc(screenX, screenY - size * 0.36, size * 0.3, 0, Math.PI * 2); ctx.fill(); if (item.tree.apples > 0) { ctx.fillStyle = '#e74c3c'; ctx.beginPath(); ctx.arc(screenX - size * 0.13, screenY - size * 0.39, Math.max(2, size * 0.045), 0, Math.PI * 2); ctx.arc(screenX + size * 0.12, screenY - size * 0.3, Math.max(2, size * 0.045), 0, Math.PI * 2); ctx.fill(); } }
+    const visibleNpcs = world.npcs.map(npc => { const dx = npc.x - player.x, dy = npc.y - player.y, distance = Math.hypot(dx, dy); let relativeAngle = Math.atan2(dy, dx) - player.angle; while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2; while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2; return { npc, distance, relativeAngle }; }).filter(item => item.distance < MAX_DEPTH && Math.abs(item.relativeAngle) < FOV / 2).sort((a, b) => b.distance - a.distance);
+    for (const item of visibleNpcs) { const corrected = item.distance * Math.cos(item.relativeAngle), screenX = centerX + Math.tan(item.relativeAngle) / Math.tan(FOV / 2) * (w / 2), size = Math.max(10, Math.min(h * 0.8, (h * 0.9) / Math.max(0.18, corrected))), screenY = centerY + size * 0.28; ctx.fillStyle = item.npc.name === 'GlennFB' ? '#ffd166' : '#fefefe'; ctx.fillRect(screenX - size * 0.16, screenY - size * 0.5, size * 0.32, size * 0.5); ctx.fillStyle = '#26384b'; ctx.fillRect(screenX - size * 0.14, screenY - size * 0.64, size * 0.28, size * 0.16); }
+    ctx.fillStyle = '#fff'; ctx.fillRect(centerX - 8, centerY - 1, 16, 2); ctx.fillRect(centerX - 1, centerY - 8, 2, 16);
+    const tree = nearestTree(), npc = nearestNpc(); if (tree && tree.apples > 0 && player.apples === 0) status.textContent = 'E / Space picks an apple'; else if (player.apples > 0) status.textContent = `E / Space eats an apple · ${player.apples} carried`; else if (tree) status.textContent = 'This tree has no apples left.'; else status.textContent = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
   }
-
-  function move(dt) {
-    const forward = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-    const strafe = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-    if (!forward && !strafe) return;
-
-    const len = Math.hypot(forward, strafe) || 1;
-    const dx = (Math.cos(player.angle) * forward - Math.sin(player.angle) * strafe) / len * player.speed * dt;
-    const dy = (Math.sin(player.angle) * forward + Math.cos(player.angle) * strafe) / len * player.speed * dt;
-
-    if (canStand(player.x + dx, player.y)) player.x += dx;
-    if (canStand(player.x, player.y + dy)) player.y += dy;
-  }
-
-  function handleKey(event, down) {
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(event.key)) {
-      event.preventDefault();
-    }
-    keys[event.code] = down;
-    if (down && (event.code === 'KeyE' || event.code === 'Space')) talk();
-  }
-
-  function bindButtonMovement() {
-    const mapping = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' };
-    document.querySelectorAll('[data-move]').forEach(button => {
-      const key = mapping[button.dataset.move];
-      const setValue = value => {
-        keys[key] = value;
-      };
-      button.addEventListener('pointerdown', event => {
-        event.preventDefault();
-        setValue(true);
-      });
-      button.addEventListener('pointerup', event => {
-        event.preventDefault();
-        setValue(false);
-      });
-      button.addEventListener('pointerleave', () => setValue(false));
-      button.addEventListener('pointercancel', () => setValue(false));
-    });
-  }
-
-  function bindPointerLook() {
-    canvas.addEventListener('pointerdown', event => {
-      event.preventDefault();
-      view.looking = true;
-      view.lastX = event.clientX;
-      if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId);
-    });
-
-    canvas.addEventListener('pointermove', event => {
-      if (!view.looking) return;
-      const dx = event.clientX - view.lastX;
-      player.angle += dx * 0.006;
-      view.lastX = event.clientX;
-    });
-
-    ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => {
-      canvas.addEventListener(type, () => {
-        view.looking = false;
-      });
-    });
-  }
-
-  function bindUI() {
-    document.getElementById('talk').addEventListener('click', talk);
-    document.getElementById('close-dialog').addEventListener('click', () => {
-      dialog.style.display = 'none';
-    });
-    document.getElementById('fullscreen').addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.();
-      } else {
-        document.exitFullscreen?.();
-      }
-    });
-  }
-
-  window.addEventListener('keydown', event => handleKey(event, true));
-  window.addEventListener('keyup', event => handleKey(event, false));
-  window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
-
-  bindButtonMovement();
-  bindPointerLook();
-  bindUI();
-  makeWorld();
-  resize();
-  window.addEventListener('resize', resize);
-
-  let last = performance.now();
-  function loop(now) {
-    const dt = Math.min((now - last) / 1000, 0.05);
-    last = now;
-    move(dt);
-    draw();
-    drawMini();
-    requestAnimationFrame(loop);
-  }
-
-  requestAnimationFrame(loop);
+  function move(dt) { const forward = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0), strafe = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0); if (!forward && !strafe) return; const len = Math.hypot(forward, strafe) || 1, dx = (Math.cos(player.angle) * forward - Math.sin(player.angle) * strafe) / len * player.speed * dt, dy = (Math.sin(player.angle) * forward + Math.cos(player.angle) * strafe) / len * player.speed * dt; if (canStand(player.x + dx, player.y)) player.x += dx; if (canStand(player.x, player.y + dy)) player.y += dy; }
+  function handleKey(event, down) { if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Spacebar'].includes(event.key)) event.preventDefault(); keys[event.code] = down; if (down && (event.code === 'KeyE' || event.code === 'Space')) interact(); }
+  function bindButtonMovement() { const mapping = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' }; document.querySelectorAll('[data-move]').forEach(button => { const key = mapping[button.dataset.move], setValue = value => { keys[key] = value; }; button.addEventListener('pointerdown', event => { event.preventDefault(); setValue(true); }); button.addEventListener('pointerup', event => { event.preventDefault(); setValue(false); }); button.addEventListener('pointerleave', () => setValue(false)); button.addEventListener('pointercancel', () => setValue(false)); }); }
+  function bindPointerLook() { canvas.addEventListener('pointerdown', event => { event.preventDefault(); view.looking = true; view.lastX = event.clientX; if (canvas.setPointerCapture) canvas.setPointerCapture(event.pointerId); }); canvas.addEventListener('pointermove', event => { if (!view.looking) return; player.angle += (event.clientX - view.lastX) * 0.006; view.lastX = event.clientX; }); ['pointerup', 'pointerleave', 'pointercancel'].forEach(type => canvas.addEventListener(type, () => { view.looking = false; })); }
+  function bindUI() { document.getElementById('talk').addEventListener('click', interact); document.getElementById('close-dialog').addEventListener('click', () => { dialog.style.display = 'none'; }); document.getElementById('fullscreen').addEventListener('click', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.(); else document.exitFullscreen?.(); }); }
+  window.addEventListener('keydown', event => handleKey(event, true)); window.addEventListener('keyup', event => handleKey(event, false)); window.addEventListener('blur', () => Object.keys(keys).forEach(k => keys[k] = false));
+  bindButtonMovement(); bindPointerLook(); bindUI(); makeWorld(); resize(); window.addEventListener('resize', resize);
+  let last = performance.now(); function loop(now) { const dt = Math.min((now - last) / 1000, 0.05); last = now; move(dt); draw(); drawMini(); requestAnimationFrame(loop); } requestAnimationFrame(loop);
 })();
 </script>
 </body>
