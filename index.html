@@ -218,14 +218,13 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     for (let x = 0; x < w; x += 1) {
       const rayAngle = player.angle - FOV / 2 + (x / range) * FOV;
       const hit = castRay(rayAngle);
+      if (hit.tile === 'rock' || hit.tile === 'sand') continue;
       const corrected = hit.dist * Math.cos(rayAngle - player.angle);
       const wallHeight = Math.min(h * 1.4, (h * 0.9) / Math.max(0.18, corrected));
       const top = centerY - wallHeight / 2;
       const bottom = centerY + wallHeight / 2;
       let hex = '#5a8f48';
-      if (hit.tile === 'rock') hex = '#5b6470';
-      else if (hit.tile === 'sand') hex = '#d7b760';
-      else if (hit.tile === 'water') hex = '#3b8dca';
+      if (hit.tile === 'water') hex = '#3b8dca';
       const brightness = 0.55 + (1 - Math.min(hit.dist / MAX_DEPTH, 1)) * 0.75;
       ctx.fillStyle = shade(hex, brightness);
       ctx.fillRect(x, top, 1, bottom - top + 1);
