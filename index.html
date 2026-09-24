@@ -31,7 +31,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 <header id="top"><div class="panel brand"><small>⛏️ IsraelCraft</small><strong>3D NPC Village</strong></div></header>
 <canvas id="minimap" width="150" height="150" aria-label="Village minimap"></canvas>
 <div id="status" class="panel">WASD / arrows move · drag to look · E or Space talks</div>
-<div id="objective" class="panel">Objective: Talk to 3 villagers.</div>
+<div id="objective" class="panel">Objective: Talk to 3 villagers (0/3).</div>
 <div id="dialog" class="panel"><div class="dialog-head"><span id="dialog-name"></span><button id="close-dialog">×</button></div><div class="dialog-text" id="dialog-text"></div></div>
 <footer id="bottom">
 <div class="panel controls">
@@ -87,16 +87,28 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
   const FOV = Math.PI / 3;
   const MAX_DEPTH = 96;
-  const objectiveGoal = 3;
+  const objectives = [
+    { goal: 3, text: 'Talk to 3 villagers.' },
+    { goal: 5, text: 'Talk to 2 more villagers.' },
+    { goal: 7, text: 'Talk to 2 more villagers.' },
+    { goal: 8, text: 'Talk to 1 more villager.' },
+    { goal: 9, text: 'Talk to the final villager.' }
+  ];
   const talkedNpcs = new Set();
+  let objectiveIndex = 0;
+  let sandboxMode = false;
 
   function updateObjective() {
-    const count = talkedNpcs.size;
-    if (count >= objectiveGoal) {
-      objective.textContent = 'Objective complete: You spoke to 3 villagers!';
-    } else {
-      objective.textContent = `Objective: Talk to ${objectiveGoal} villagers (${count}/${objectiveGoal}).`;
+    if (objectiveIndex >= objectives.length) {
+      sandboxMode = true;
+      objective.style.display = 'none';
+      status.textContent = 'Game beaten! Sandbox mode unlocked.';
+      return;
     }
+
+    const current = objectives[objectiveIndex];
+    const previousGoal = objectiveIndex === 0 ? 0 : objectives[objectiveIndex - 1].goal;
+    objective.textContent = `Objective ${objectiveIndex + 1}/5: ${current.text} (${talkedNpcs.size - previousGoal}/${current.goal - previousGoal}).`;
   }
 
   function resize() {
@@ -171,6 +183,9 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
 
     if (!talkedNpcs.has(npc.name)) {
       talkedNpcs.add(npc.name);
+      if (!sandboxMode && objectiveIndex < objectives.length && talkedNpcs.size >= objectives[objectiveIndex].goal) {
+        objectiveIndex += 1;
+      }
       updateObjective();
     }
 
@@ -295,8 +310,10 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
     ctx.fillRect(centerX - 8, centerY - 1, 16, 2);
     ctx.fillRect(centerX - 1, centerY - 8, 2, 16);
 
-    const npc = nearestNpc();
-    status.textContent = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
+    if (!sandboxMode) {
+      const npc = nearestNpc();
+      status.textContent = npc ? `E or Space talks to ${npc.name}` : 'WASD / arrows move · drag to look · E or Space talks';
+    }
   }
 
   function move(dt) {
