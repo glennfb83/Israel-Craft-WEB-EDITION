@@ -83,7 +83,7 @@ body{background:#162536;color:var(--ink);font:14px system-ui,sans-serif}
   const player = { x: 16.5, y: 16.5, r: 0.27, speed: 4.8, angle: 0 };
   const view = { w: innerWidth, h: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2), looking: false, lastX: 0 };
   const FOV = Math.PI / 3;
-  const MAX_DEPTH = 48;
+  const MAX_DEPTH = 96;
 
   function resize() {
     view.w = innerWidth;
